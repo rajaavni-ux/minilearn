@@ -1,35 +1,39 @@
+"""Linear regression solved directly (no training loop needed)."""
 import numpy as np
-from minilearn.base import BaseEstimator
+from ..base import BaseEstimator
+
 
 class LinearRegression(BaseEstimator):
-    def __init__(self, learning_rate=0.01, epochs=1000):
-        self.learning_rate = learning_rate
-        self.epochs = epochs
-        self.weights = None
-        self.bias = None
+    """Fit y = X @ coef_ + intercept_ by least squares.
+
+    np.linalg.lstsq solves the same problem as the "normal equation"
+    (X^T X) w = X^T y, but is more stable when features are correlated.
+    """
+
+    _estimator_type = "regressor"
+
+    def __init__(self, fit_intercept=True):
+        self.fit_intercept = fit_intercept
 
     def fit(self, X, y):
-        # Enforce the API contract
-        X, y = self._validate_input(X, y)
-        n_samples, n_features = X.shape
-        
-        # Initialize weights to zero
-        self.weights = np.zeros(n_features)
-        self.bias = 0.0
+        X, y = self._check_X_y(X, y)
+        y = y.astype(float)
 
-        # Gradient Descent Loop
-        for _ in range(self.epochs):
-            # 1. Calculate predictions
-            y_predicted = np.dot(X, self.weights) + self.bias
-            
-            # 2. Calculate the gradients (derivatives)
-            dw = (1 / n_samples) * np.dot(X.T, (y_predicted - y))
-            db = (1 / n_samples) * np.sum(y_predicted - y)
-            
-            # 3. Update the weights
-            self.weights -= self.learning_rate * dw
-            self.bias -= self.learning_rate * db
+        if self.fit_intercept:
+            ones = np.ones((len(X), 1))
+            X = np.hstack([ones, X])        # first column of 1s learns the intercept
+
+        weights, *_ = np.linalg.lstsq(X, y, rcond=None)
+
+        if self.fit_intercept:
+            self.intercept_ = float(weights[0])
+            self.coef_ = weights[1:]
+        else:
+            self.intercept_ = 0.0
+            self.coef_ = weights
+        return self
 
     def predict(self, X):
-        X, _ = self._validate_input(X)
-        return np.dot(X, self.weights) + self.bias
+        self._check_is_fitted("coef_")
+        X = self._check_X(X)
+        return X @ self.coef_ + self.intercept_
